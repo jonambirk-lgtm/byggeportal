@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from './supabase'
 
-const MULTI_TENANT_ENABLED = false;
+// const MULTI_TENANT_ENABLED = true;const MULTI_TENANT_ENABLED = false;
 
 const DEFAULT_SETTINGS = {
   companyName: "ABA Teknik ApS",
@@ -589,7 +589,7 @@ function ColleaguesPage({users, user, acc, setUsers, showToast, onCompose}) {
         <div class="sub">${roleLabel(u.role)} · ${u.dept||"—"}</div>
         <div class="sub">✉ ${u.email}${u.phone?` · 📞 ${u.phone}`:""}</div>
       </div></div>`).join("")}
-    <script>window.print();<\/script></body></html>`);
+    <script>window.print();</script></body></html>`);
     w.document.close();
   };
 
