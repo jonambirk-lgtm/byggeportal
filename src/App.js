@@ -4,6 +4,9 @@ import { supabase } from "./supabase";
 function App() {
   const [loading, setLoading] = useState(true);
 
+  // ✅ NY
+  const [currentUser, setCurrentUser] = useState(null);
+
   useEffect(() => {
     const handleUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -45,26 +48,45 @@ function App() {
               console.error("Insert user error:", error);
             }
           }
+
+          // ✅ 🔥 DET HER MANGLEDE
+          const { data: dbUser, error: userError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+
+          if (userError) {
+            console.error("Fetch user error:", userError);
+          }
+
+          // ✅ Brug DB user (med role!)
+          setCurrentUser(dbUser);
+
         } catch (err) {
           console.error("ensureUserExists crash:", err);
         }
       }
 
-      // ✅ 3. Først nu loader appen
       setLoading(false);
     };
 
     handleUser();
   }, []);
 
-  // ✅ stopper app indtil user er klar
   if (loading) {
     return <div style={{padding:20}}>Loader...</div>;
   }
 
   return (
     <div>
-      {/* din app */}
+      {/* ✅ IMPORTANT: brug currentUser */}
+      {currentUser && (
+        <div>
+          Logget ind som: {currentUser.email} <br />
+          Rolle: {currentUser.role}
+        </div>
+      )}
     </div>
   );
 }
