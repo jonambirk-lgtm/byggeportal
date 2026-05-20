@@ -1,6 +1,91 @@
 import { useEffect, useState } from "react";
 import { supabase } from "./supabase";
 
+
+const [messages, setMessages] = useState([]);
+const [requests, setRequests] = useState([]);
+const [absence, setAbsence] = useState([]);
+const [notifications, setNotifications] = useState([]);
+const loadMessages = async () => {
+  const { data } = await supabase
+    .from("messages")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  setMessages(data || []);
+};
+
+const loadRequests = async () => {
+  const { data } = await supabase
+    .from("requests")
+    .select("*");
+
+  setRequests(data || []);
+};
+
+const loadAbsence = async () => {
+  const { data } = await supabase
+    .from("absence")
+    .select("*");
+
+  setAbsence(data || []);
+};
+
+const loadNotifications = async () => {
+  const { data } = await supabase
+    .from("notifications")
+    .select("*");
+
+  setNotifications(data || []);
+};
+useEffect(() => {
+  if (!currentUser) return;
+
+  // ✅ initial load
+  loadMessages();
+  loadRequests();
+  loadAbsence();
+  loadNotifications();
+
+  const channel = supabase
+    .channel("global-realtime")
+
+    // ✅ messages
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "messages" },
+      () => loadMessages()
+    )
+
+    // ✅ requests
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "requests" },
+      () => loadRequests()
+    )
+
+    // ✅ absence
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "absence" },
+      () => loadAbsence()
+    )
+
+    // ✅ notifications
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "notifications" },
+      () => loadNotifications()
+    )
+
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [currentUser]);
+
+
 function App() {
   const [loading, setLoading] = useState(true);
 
@@ -1860,4 +1945,82 @@ async function ensureUserExists(user) {
     })
   }
 }
-``
+const [messages, setMessages] = useState([]);
+const [requests, setRequests] = useState([]);
+const [absence, setAbsence] = useState([]);
+
+const loadMessages = async () => {
+  const { data } = await supabase
+    .from("messages")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  setMessages(data || []);
+};
+
+const loadRequests = async () => {
+  const { data } = await supabase
+    .from("requests")
+    .select("*");
+
+  setRequests(data || []);
+};
+
+const loadAbsence = async () => {
+  const { data } = await supabase
+    .from("absence")
+    .select("*");
+
+  setAbsence(data || []);
+};
+useEffect(() => {
+  // 🔹 initial load
+  loadMessages();
+  loadRequests();
+  loadAbsence();
+
+  // 🔥 realtime master
+  const channel = supabase
+    .channel("global-realtime")
+
+    // ✅ MESSAGES
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "messages" },
+      () => {
+        loadMessages();
+      }
+    )
+
+    // ✅ REQUESTS
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "requests" },
+      () => {
+        loadRequests();
+      }
+    )
+
+    // ✅ ABSENCE
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "absence" },
+      () => {
+        loadAbsence();
+      }
+    )
+
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
+const sendMessage = async (text, toId) => {
+  await supabase.from("messages").insert({
+    from_id: currentUser.id,
+    to_id: toId,
+    text
+  });
+};
+if (!currentUser) return <div>Loader...</div>;
