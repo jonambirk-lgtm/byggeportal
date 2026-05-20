@@ -1,6 +1,39 @@
 import { useState, useEffect, useRef } from "react";
 import { supabase } from './supabase'
 
+useEffect(() => {
+  const handleUser = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    const user = session?.user;
+
+    if (user) {
+      
+      // ✅ 1. Firma login check
+      
+const email =
+  user.email ||
+  user.user_metadata?.email ||
+  user.user_metadata?.preferred_username;
+
+if (
+  !email?.endsWith('@abateknik.dk') &&
+  !email?.endsWith('@0-20.dk')
+) {
+  alert('Kun firma emails er tilladt')
+  await supabase.auth.signOut()
+  return
+}
+
+
+      // ✅ 2. Opret user hvis mangler
+      await ensureUserExists(user);
+    }
+  };
+
+  handleUser();
+}, []);
+
 // const MULTI_TENANT_ENABLED = true;const MULTI_TENANT_ENABLED = false;
 
 const DEFAULT_SETTINGS = {
@@ -1752,3 +1785,20 @@ export default function App() {
     </div>
   );
 }
+async function ensureUserExists(user) {
+  const { data } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .single()
+
+  if (!data) {
+    await supabase.from('users').insert({
+      id: user.id,
+      email: user.email,
+      name: user.user_metadata?.full_name || user.email,
+      role: 'montør' // default rolle
+    })
+  }
+}
+``
