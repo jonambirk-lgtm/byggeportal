@@ -1,38 +1,75 @@
-import { useState, useEffect, useRef } from "react";
-import { supabase } from './supabase'
+import { useEffect, useState } from "react";
+import { supabase } from "./supabase";
 
-useEffect(() => {
-  const handleUser = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+function App() {
+  const [loading, setLoading] = useState(true);
 
-    const user = session?.user;
+  useEffect(() => {
+    const handleUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
 
-    if (user) {
-      
-      // ✅ 1. Firma login check
-      
-const email =
-  user.email ||
-  user.user_metadata?.email ||
-  user.user_metadata?.preferred_username;
+      if (user) {
+        const email =
+          user.email ||
+          user.user_metadata?.email ||
+          user.user_metadata?.preferred_username;
 
-if (
-  !email?.endsWith('@abateknik.dk') &&
-  !email?.endsWith('@0-20.dk')
-) {
-  alert('Kun firma emails er tilladt')
-  await supabase.auth.signOut()
-  return
+        // ✅ 1. Firma login check
+        if (
+          !email?.endsWith('@abateknik.dk') &&
+          !email?.endsWith('@0-20.dk')
+        ) {
+          alert('Kun firma emails er tilladt');
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
+
+        // ✅ 2. Opret user hvis mangler
+        try {
+          const { data: existingUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          if (!existingUser) {
+            const { error } = await supabase.from('users').insert({
+              id: user.id,
+              email: email,
+              role: 'montør'
+            });
+
+            if (error) {
+              console.error("Insert user error:", error);
+            }
+          }
+        } catch (err) {
+          console.error("ensureUserExists crash:", err);
+        }
+      }
+
+      // ✅ 3. Først nu loader appen
+      setLoading(false);
+    };
+
+    handleUser();
+  }, []);
+
+  // ✅ stopper app indtil user er klar
+  if (loading) {
+    return <div style={{padding:20}}>Loader...</div>;
+  }
+
+  return (
+    <div>
+      {/* din app */}
+    </div>
+  );
 }
 
-
-      // ✅ 2. Opret user hvis mangler
-      await ensureUserExists(user);
-    }
-  };
-
-  handleUser();
-}, []);
+export default App;
 
 // const MULTI_TENANT_ENABLED = true;const MULTI_TENANT_ENABLED = false;
 
