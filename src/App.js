@@ -1170,15 +1170,16 @@ export default function App() {
   // AUTH
   useEffect(()=>{
     const handleSession = async (session) => {
+  setLoading(true);
   if(!session){ setUser(null); setLoading(false); return; }
   const email = session.user.email;
-  if(!email.endsWith('@abateknik.dk')){
-    await supabase.auth.signOut(); 
-    alert('Kun @abateknik.dk konti');
+  if(!email.endsWith('@abateknik.dk') && !email.endsWith('@0-20.dk')){
+    await supabase.auth.signOut();
+    alert('Kun firma emails er tilladt');
     setLoading(false); return;
   }
   try {
-    let {data} = await supabase.from('users').select('*').eq('email',email).single();
+    let {data} = await supabase.from('users').select('*').eq('email',email).maybeSingle();
     if(!data){
       const name = session.user.user_metadata?.name||session.user.user_metadata?.full_name||email.split('@')[0];
       const initials = name.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
@@ -1188,8 +1189,10 @@ export default function App() {
       data = nu;
     }
     if(data){ setUser(data); setPage('dashboard'); setActiveWidgets(defaultWidgets(data.role)); }
+    else { setUser(null); }
   } catch(err) {
     console.error('Auth fejl:', err);
+    setUser(null);
   } finally {
     setLoading(false);
   }
