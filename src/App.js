@@ -1068,7 +1068,6 @@ export default function App() {
     const loadMessages = () => supabase.from('messages').select('*').or(`to_id.eq.${user.id},from_id.eq.${user.id}`).order('created_at',{ascending:false}).then(({data})=>{ if(data) setMessages(data.map(m=>({...m,fromId:m.from_id,toId:m.to_id,time:m.created_at}))); });
     const loadAbsence  = () => supabase.from('absence').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setAbsence(data.map(a=>({...a,from:a.from_date,to:a.to_date}))); });
     const loadRequests = () => supabase.from('requests').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setRequests(data.map(r=>({...r,desc:r.description,date:r.created_at?.slice(0,10)}))); });
-    const loadNotifs   = () => supabase.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).then(({data})=>{ if(data) setNotifs(data.map(n=>({...n,time:n.created_at}))); });
 
     const channel = supabase.channel('realtime-all-'+user.id)
       .on('postgres_changes',{event:'*',schema:'public',table:'news'},           ()=>loadNews())
@@ -1762,20 +1761,4 @@ export default function App() {
       {toast&&<div style={{position:"fixed",bottom:24,right:24,background:toast.type==="warning"?"#d97706":"#1a1a1a",color:"#fff",borderRadius:10,padding:"13px 20px",fontSize:14,fontWeight:500,boxShadow:"0 8px 30px #00000040",zIndex:300,maxWidth:340}}>{toast.msg}</div>}
     </div>
   );
-}
-async function ensureUserExists(user) {
-  const { data } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  if (!data) {
-    await supabase.from('users').insert({
-      id: user.id,
-      email: user.email,
-      name: user.user_metadata?.full_name || user.email,
-      role: 'montør' // default rolle
-    })
-  }
 }
