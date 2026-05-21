@@ -1039,8 +1039,9 @@ export default function App() {
     return ()=>subscription.unsubscribe();
   },[]);
 
-  // DATA FETCH
+  // DATA FETCH — kører når user er klar
   useEffect(()=>{
+    if(!user) return;
     supabase.from('settings').select('*').single().then(({data})=>{ if(data) setSettings({companyName:data.company_name,accentColor:data.accent_color,logo:data.logo_url}); });
     supabase.from('users').select('*').then(({data})=>{ if(data) setUsers(data); });
     supabase.from('news').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setNews(data.map(n=>({...n,date:n.created_at?.slice(0,10),pinned:n.pinned||false}))); });
@@ -1048,13 +1049,9 @@ export default function App() {
     supabase.from('absence').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setAbsence(data.map(a=>({...a,from:a.from_date,to:a.to_date}))); });
     supabase.from('requests').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setRequests(data.map(r=>({...r,desc:r.description,date:r.created_at?.slice(0,10)}))); });
     supabase.from('audit_log').select('*').order('created_at',{ascending:false}).limit(50).then(({data})=>{ if(data) setAuditLog(data); });
-  },[]);
-
-  useEffect(()=>{
-    if(!user) return;
     supabase.from('messages').select('*').or(`to_id.eq.${user.id},from_id.eq.${user.id}`).order('created_at',{ascending:false}).then(({data})=>{ if(data) setMessages(data.map(m=>({...m,fromId:m.from_id,toId:m.to_id,time:m.created_at}))); });
     supabase.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).then(({data})=>{ if(data) setNotifs(data.map(n=>({...n,time:n.created_at}))); });
-  },[user]);
+  },[user?.id]);
 
   const acc = settings.accentColor;
   const showToast = (msg,type="success") => { setToast({msg,type}); setTimeout(()=>setToast(null),3500); };
@@ -1723,7 +1720,8 @@ export default function App() {
         <Btn variant="outline" accent="#999" onClick={()=>setNewsModal(false)} style={{flex:1}}>Annuller</Btn>
         <Btn accent={acc} style={{flex:2}} onClick={async()=>{
           if(!f.title)return;
-          const {data}=await supabase.from('news').insert({title:f.title,body:f.body,category:f.category,pinned:f.pinned,created_by:user.id}).select().single();
+          const {data, error}=await supabase.from('news').insert({title:f.title,body:f.body,category:f.category,pinned:f.pinned,created_by:user.id}).select().single();
+          if(error){ console.error("News insert fejl:",error); showToast("Fejl: "+error.message,"warning"); return; }
           if(data) setNews(n=>[{...data,date:data.created_at?.slice(0,10)},...n]);
           for(const u of users){ await pushNotif(u.id,"Nyt opslag: "+f.title,"info"); }
           setNewsModal(false); showToast("✓ Opslag publiceret");
