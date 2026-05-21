@@ -1,184 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "./supabase";
-
-
-const [messages, setMessages] = useState([]);
-const [requests, setRequests] = useState([]);
-const [absence, setAbsence] = useState([]);
-const [notifications, setNotifications] = useState([]);
-const loadMessages = async () => {
-  const { data } = await supabase
-    .from("messages")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  setMessages(data || []);
-};
-
-const loadRequests = async () => {
-  const { data } = await supabase
-    .from("requests")
-    .select("*");
-
-  setRequests(data || []);
-};
-
-const loadAbsence = async () => {
-  const { data } = await supabase
-    .from("absence")
-    .select("*");
-
-  setAbsence(data || []);
-};
-
-const loadNotifications = async () => {
-  const { data } = await supabase
-    .from("notifications")
-    .select("*");
-
-  setNotifications(data || []);
-};
-useEffect(() => {
-  if (!currentUser) return;
-
-  // ✅ initial load
-  loadMessages();
-  loadRequests();
-  loadAbsence();
-  loadNotifications();
-
-  const channel = supabase
-    .channel("global-realtime")
-
-    // ✅ messages
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "messages" },
-      () => loadMessages()
-    )
-
-    // ✅ requests
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "requests" },
-      () => loadRequests()
-    )
-
-    // ✅ absence
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "absence" },
-      () => loadAbsence()
-    )
-
-    // ✅ notifications
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "notifications" },
-      () => loadNotifications()
-    )
-
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [currentUser]);
-
-
-function App() {
-  const [loading, setLoading] = useState(true);
-
-  // ✅ NY
-  const [currentUser, setCurrentUser] = useState(null);
-
-  useEffect(() => {
-    const handleUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user;
-
-      if (user) {
-        const email =
-          user.email ||
-          user.user_metadata?.email ||
-          user.user_metadata?.preferred_username;
-
-        // ✅ 1. Firma login check
-        if (
-          !email?.endsWith('@abateknik.dk') &&
-          !email?.endsWith('@0-20.dk')
-        ) {
-          alert('Kun firma emails er tilladt');
-          await supabase.auth.signOut();
-          setLoading(false);
-          return;
-        }
-
-        // ✅ 2. Opret user hvis mangler
-        try {
-          const { data: existingUser } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', user.id)
-            .maybeSingle();
-
-          if (!existingUser) {
-            const { error } = await supabase.from('users').insert({
-              id: user.id,
-              email: email,
-              role: 'montør'
-            });
-
-            if (error) {
-              console.error("Insert user error:", error);
-            }
-          }
-
-          // ✅ 🔥 DET HER MANGLEDE
-          const { data: dbUser, error: userError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', user.id)
-            .single();
-
-          if (userError) {
-            console.error("Fetch user error:", userError);
-          }
-
-          // ✅ Brug DB user (med role!)
-          setCurrentUser(dbUser);
-
-        } catch (err) {
-          console.error("ensureUserExists crash:", err);
-        }
-      }
-
-      setLoading(false);
-    };
-
-    handleUser();
-  }, []);
-
-  if (loading) {
-    return <div style={{padding:20}}>Loader...</div>;
-  }
-
-  return (
-    <div>
-      {/* ✅ IMPORTANT: brug currentUser */}
-      {currentUser && (
-        <div>
-          Logget ind som: {currentUser.email} <br />
-          Rolle: {currentUser.role}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default App;
-
-// const MULTI_TENANT_ENABLED = true;const MULTI_TENANT_ENABLED = false;
 
 const DEFAULT_SETTINGS = {
   companyName: "ABA Teknik ApS",
@@ -600,8 +421,6 @@ function MessagesPage({user, users, messages, setMessages, acc, pushNotif, showT
     if(!activeThread||!newMsg.trim()) return;
     await sendMessage(activeThread.otherUser?.id, activeThread.subject, newMsg);
     setNewMsg("");
-    const {data}=await supabase.from('messages').select('*').or(`to_id.eq.${user.id},from_id.eq.${user.id}`).order('created_at',{ascending:false});
-    if(data) setMessages(data.map(m=>({...m,fromId:m.from_id,toId:m.to_id,time:m.created_at})));
   };
 
   const markRead = async (msgs) => {
@@ -694,8 +513,6 @@ function MessagesPage({user, users, messages, setMessages, acc, pushNotif, showT
               if(!newRecipient||!newBody.trim()) return;
               await sendMessage(newRecipient, newSubject||"Besked", newBody);
               setNewMsgModal(false); setNewRecipient(""); setNewSubject(""); setNewBody(""); onClearRecipient?.();
-              const {data}=await supabase.from('messages').select('*').or(`to_id.eq.${user.id},from_id.eq.${user.id}`).order('created_at',{ascending:false});
-              if(data) setMessages(data.map(m=>({...m,fromId:m.from_id,toId:m.to_id,time:m.created_at})));
             }}>Send besked ↑</Btn>
           </div>
         </Modal>
@@ -1035,7 +852,7 @@ function FollowupPage({users, absence, user, acc}) {
 
   const myTeam = users.filter(u=>u.role!=="it_admin"&&(can(user,"viewFollowupAll")?true:u.manager_id===user.id));
   const stats = myTeam.map(emp=>{
-    const ea = absence.filter(a=>a.user_id===emp.id&&pf(a.from_date||a.from,p=>pf(a.from_date||a.from,period))&&(filterType==="Alle"||a.type===filterType));
+    const ea = absence.filter(a=>a.user_id===emp.id&&pf(a.from_date||a.from,period)&&(filterType==="Alle"||a.type===filterType));
     const totalDays = ea.reduce((s,a)=>s+a.days,0);
     const occurrences = ea.length;
     const lastDate = ea.length>0 ? [...ea].sort((a,b)=>new Date(b.from_date||b.from)-new Date(a.from_date||a.from))[0].from_date||ea[0].from : null;
@@ -1239,19 +1056,36 @@ export default function App() {
     supabase.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).then(({data})=>{ if(data) setNotifs(data.map(n=>({...n,time:n.created_at}))); });
   },[user]);
 
+  const acc = settings.accentColor;
+  const showToast = (msg,type="success") => { setToast({msg,type}); setTimeout(()=>setToast(null),3500); };
+
+  // ─── REALTIME — master channel for alle tabeller ───
   useEffect(()=>{
     if(!user) return;
-    const channel = supabase.channel('notifs-'+user.id)
+
+    const loadNews     = () => supabase.from('news').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setNews(data.map(n=>({...n,date:n.created_at?.slice(0,10),pinned:n.pinned||false}))); });
+    const loadEvents   = () => supabase.from('events').select('*, event_attendees(user_id)').order('event_date',{ascending:true}).then(({data})=>{ if(data) setEvents(data.map(e=>({...e,date:e.event_date,time:e.event_time,desc:e.description,type:e.type||'Andet',attendees:(e.event_attendees||[]).map(a=>a.user_id)}))); });
+    const loadMessages = () => supabase.from('messages').select('*').or(`to_id.eq.${user.id},from_id.eq.${user.id}`).order('created_at',{ascending:false}).then(({data})=>{ if(data) setMessages(data.map(m=>({...m,fromId:m.from_id,toId:m.to_id,time:m.created_at}))); });
+    const loadAbsence  = () => supabase.from('absence').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setAbsence(data.map(a=>({...a,from:a.from_date,to:a.to_date}))); });
+    const loadRequests = () => supabase.from('requests').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setRequests(data.map(r=>({...r,desc:r.description,date:r.created_at?.slice(0,10)}))); });
+    const loadNotifs   = () => supabase.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).then(({data})=>{ if(data) setNotifs(data.map(n=>({...n,time:n.created_at}))); });
+
+    const channel = supabase.channel('realtime-all-'+user.id)
+      .on('postgres_changes',{event:'*',schema:'public',table:'news'},           ()=>loadNews())
+      .on('postgres_changes',{event:'*',schema:'public',table:'events'},         ()=>loadEvents())
+      .on('postgres_changes',{event:'*',schema:'public',table:'event_attendees'},()=>loadEvents())
+      .on('postgres_changes',{event:'*',schema:'public',table:'messages'},       ()=>loadMessages())
+      .on('postgres_changes',{event:'*',schema:'public',table:'absence'},        ()=>loadAbsence())
+      .on('postgres_changes',{event:'*',schema:'public',table:'requests'},       ()=>loadRequests())
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:`user_id=eq.${user.id}`},payload=>{
         const n=payload.new;
         setNotifs(prev=>[{...n,time:n.created_at},...prev]);
         showToast(n.text, n.type==="success"?"success":"info");
-      }).subscribe();
+      })
+      .subscribe();
+
     return ()=>supabase.removeChannel(channel);
   },[user]);
-
-  const acc = settings.accentColor;
-  const showToast = (msg,type="success") => { setToast({msg,type}); setTimeout(()=>setToast(null),3500); };
   const pushNotif = async (user_id,text,type="info") => {
     await supabase.from('notifications').insert({user_id,text,type});
     setNotifs(n=>[{id:Date.now(),user_id,text,read:false,time:new Date().toISOString(),type},...n]);
@@ -1880,7 +1714,7 @@ export default function App() {
 
 
   const NewsForm = () => {
-    const [f,setF]=useState({title:"",body:"",category:"Nyheder",pinned:false});
+    const [f,setF]=useState({title:"",body:"",category:"Personale",pinned:false});
     return(<Modal title="Nyt opslag" onClose={()=>setNewsModal(false)}>
       <Inp label="Overskrift" value={f.title} onChange={e=>setF({...f,title:e.target.value})}/>
       <Sel label="Kategori" value={f.category} onChange={e=>setF({...f,category:e.target.value})}>{"Socialt,Personale,Sikkerhed,Nyt fra kontoret,Salg & Tilbud,Andet".split(",").map(c=><option key={c}>{c}</option>)}</Sel>
@@ -1945,82 +1779,3 @@ async function ensureUserExists(user) {
     })
   }
 }
-const [messages, setMessages] = useState([]);
-const [requests, setRequests] = useState([]);
-const [absence, setAbsence] = useState([]);
-
-const loadMessages = async () => {
-  const { data } = await supabase
-    .from("messages")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  setMessages(data || []);
-};
-
-const loadRequests = async () => {
-  const { data } = await supabase
-    .from("requests")
-    .select("*");
-
-  setRequests(data || []);
-};
-
-const loadAbsence = async () => {
-  const { data } = await supabase
-    .from("absence")
-    .select("*");
-
-  setAbsence(data || []);
-};
-useEffect(() => {
-  // 🔹 initial load
-  loadMessages();
-  loadRequests();
-  loadAbsence();
-
-  // 🔥 realtime master
-  const channel = supabase
-    .channel("global-realtime")
-
-    // ✅ MESSAGES
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "messages" },
-      () => {
-        loadMessages();
-      }
-    )
-
-    // ✅ REQUESTS
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "requests" },
-      () => {
-        loadRequests();
-      }
-    )
-
-    // ✅ ABSENCE
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "absence" },
-      () => {
-        loadAbsence();
-      }
-    )
-
-    .subscribe();
-
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, []);
-const sendMessage = async (text, toId) => {
-  await supabase.from("messages").insert({
-    from_id: currentUser.id,
-    to_id: toId,
-    text
-  });
-};
-if (!currentUser) return <div>Loader...</div>;
