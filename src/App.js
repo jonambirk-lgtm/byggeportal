@@ -1045,8 +1045,6 @@ function RequestsPage({user, users, acc, visibleRequests, can, approveItem, reje
   ];
   const filtered = tab==="alle" ? visibleRequests : visibleRequests.filter(r=>r.status?.toLowerCase()===tab);
   const pending = visibleRequests.filter(r=>r.status==="Afventer"&&r.user_id!==user.id).length;
-  const priColor = p=>({Høj:"#dc2626",Normal:"#d97706",Lav:"#2e9e5b"}[p]||"#777");
-
   return(
     <div style={{padding:24}}>
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
