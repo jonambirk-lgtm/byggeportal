@@ -952,6 +952,169 @@ function FollowupPage({users, absence, user, acc}) {
 // ─────────────────────────────────────────────
 // PROFIL TELEFON EDITOR
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// FRAVÆR & FERIE SIDE
+// ─────────────────────────────────────────────
+function AbsencePage({user, users, acc, visibleAbsence, can, approveItem, rejectItem, setAbsenceModal, fmt}) {
+  const [tab, setTab] = useState("afventer");
+  const tabs = [
+    {id:"afventer", label:"⏳ Afventer",  color:"#d97706"},
+    {id:"godkendt", label:"✅ Godkendt",  color:"#2e9e5b"},
+    {id:"afvist",   label:"❌ Afvist",    color:"#dc2626"},
+    {id:"alle",     label:"📋 Alle",      color:"#888"},
+  ];
+  const filtered = tab==="alle" ? visibleAbsence : visibleAbsence.filter(a=>a.status?.toLowerCase()===tab);
+  const pending = visibleAbsence.filter(a=>a.status==="Afventer"&&a.user_id!==user.id).length;
+
+  return(
+    <div style={{padding:24}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
+        <div>
+          <div style={{fontWeight:700,fontSize:18}}>{can(user,"approveAbsence")?"Fravær & Ferie — Godkendelse":"Mine fraværsanmodninger"}</div>
+          {can(user,"approveAbsence")&&pending>0&&<div style={{fontSize:13,color:"#d97706",marginTop:3}}>⏳ {pending} afventer din godkendelse</div>}
+        </div>
+        <Btn onClick={()=>setAbsenceModal(true)} accent={acc}>+ Ny anmodning</Btn>
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:4,marginBottom:20,background:"#fff",borderRadius:10,padding:4,border:"1px solid #e0ddd8",width:"fit-content"}}>
+        {tabs.map(t=>{
+          const count = t.id==="alle" ? visibleAbsence.length : visibleAbsence.filter(a=>a.status?.toLowerCase()===t.id).length;
+          return(
+            <button key={t.id} onClick={()=>setTab(t.id)}
+              style={{padding:"8px 16px",borderRadius:8,border:"none",background:tab===t.id?t.color:"transparent",color:tab===t.id?"#fff":"#666",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"'Urbanist',sans-serif",display:"flex",alignItems:"center",gap:6}}>
+              {t.label}
+              {count>0&&<span style={{background:tab===t.id?"rgba(255,255,255,0.3)":t.color+"20",color:tab===t.id?"#fff":t.color,borderRadius:10,padding:"0 7px",fontSize:11,fontWeight:700}}>{count}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {filtered.length===0&&(
+        <Card><div style={{textAlign:"center",color:"#aaa",fontSize:14,padding:32}}>Ingen anmodninger i denne kategori</div></Card>
+      )}
+
+      <div style={{display:"grid",gap:12}}>
+        {filtered.map((a,i)=>{
+          const person = users.find(u=>u.id===a.user_id);
+          const isOwn = a.user_id===user.id;
+          const canApprove = can(user,"approveAbsence")&&a.status==="Afventer"&&!isOwn;
+          return(
+            <div key={a.id||i} style={{background:"#fff",border:`1.5px solid ${a.status==="Afventer"?"#fcd20940":a.status==="Godkendt"?"#2e9e5b30":"#dc262630"}`,borderRadius:12,padding:"16px 20px",display:"flex",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
+              {can(user,"approveAbsence")&&<Av src={person?.photo_url} initials={person?.avatar||"?"} size={42} bg={acc}/>}
+              <div style={{flex:1,minWidth:200}}>
+                {can(user,"approveAbsence")&&<div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{person?.name||"Ukendt"}<span style={{fontSize:11,color:"#aaa",fontWeight:400,marginLeft:8}}>{person?.dept||"—"}</span></div>}
+                <div style={{fontWeight:isOwn?700:600,fontSize:isOwn?16:14,color:"#1a1a1a"}}>{a.type}</div>
+                <div style={{fontSize:13,color:"#666",marginTop:3}}>📅 {fmt(a.from_date||a.from)} → {fmt(a.to_date||a.to)}</div>
+                <div style={{fontSize:12,color:"#888",marginTop:2}}>🗓 {a.days} dag{a.days!==1?"e":""}</div>
+                {a.note&&<div style={{fontSize:12,color:"#777",marginTop:6,background:"#f8f7f5",borderRadius:6,padding:"6px 10px"}}>💬 {a.note}</div>}
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8,flexShrink:0}}>
+                <Badge label={a.status} color={a.status==="Godkendt"?"#2e9e5b":a.status==="Afvist"?"#dc2626":"#d97706"}/>
+                {canApprove&&(
+                  <div style={{display:"flex",gap:8,marginTop:4}}>
+                    <button onClick={()=>approveItem(a,"absence")}
+                      style={{background:"#2e9e5b",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"'Urbanist',sans-serif",display:"flex",alignItems:"center",gap:6}}>
+                      ✓ Godkend
+                    </button>
+                    <button onClick={()=>rejectItem(a,"absence")}
+                      style={{background:"#fff",color:"#dc2626",border:"1.5px solid #dc2626",borderRadius:8,padding:"8px 18px",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"'Urbanist',sans-serif",display:"flex",alignItems:"center",gap:6}}>
+                      ✗ Afvis
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// ANMODNINGER SIDE
+// ─────────────────────────────────────────────
+function RequestsPage({user, users, acc, visibleRequests, can, approveItem, rejectItem, setRequestModal, fmt}) {
+  const [tab, setTab] = useState("afventer");
+  const tabs = [
+    {id:"afventer", label:"⏳ Afventer",  color:"#d97706"},
+    {id:"godkendt", label:"✅ Godkendt",  color:"#2e9e5b"},
+    {id:"afvist",   label:"❌ Afvist",    color:"#dc2626"},
+    {id:"alle",     label:"📋 Alle",      color:"#888"},
+  ];
+  const filtered = tab==="alle" ? visibleRequests : visibleRequests.filter(r=>r.status?.toLowerCase()===tab);
+  const pending = visibleRequests.filter(r=>r.status==="Afventer"&&r.user_id!==user.id).length;
+  const priColor = p=>({Høj:"#dc2626",Normal:"#d97706",Lav:"#2e9e5b"}[p]||"#777");
+
+  return(
+    <div style={{padding:24}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:10}}>
+        <div>
+          <div style={{fontWeight:700,fontSize:18}}>{can(user,"approveRequests")?"Anmodninger — Godkendelse":"Mine anmodninger"}</div>
+          {can(user,"approveRequests")&&pending>0&&<div style={{fontSize:13,color:"#d97706",marginTop:3}}>⏳ {pending} afventer din godkendelse</div>}
+        </div>
+        <Btn onClick={()=>setRequestModal(true)} accent={acc}>+ Ny anmodning</Btn>
+      </div>
+
+      {/* Tabs */}
+      <div style={{display:"flex",gap:4,marginBottom:20,background:"#fff",borderRadius:10,padding:4,border:"1px solid #e0ddd8",width:"fit-content"}}>
+        {tabs.map(t=>{
+          const count = t.id==="alle" ? visibleRequests.length : visibleRequests.filter(r=>r.status?.toLowerCase()===t.id).length;
+          return(
+            <button key={t.id} onClick={()=>setTab(t.id)}
+              style={{padding:"8px 16px",borderRadius:8,border:"none",background:tab===t.id?t.color:"transparent",color:tab===t.id?"#fff":"#666",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"'Urbanist',sans-serif",display:"flex",alignItems:"center",gap:6}}>
+              {t.label}
+              {count>0&&<span style={{background:tab===t.id?"rgba(255,255,255,0.3)":t.color+"20",color:tab===t.id?"#fff":t.color,borderRadius:10,padding:"0 7px",fontSize:11,fontWeight:700}}>{count}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {filtered.length===0&&(
+        <Card><div style={{textAlign:"center",color:"#aaa",fontSize:14,padding:32}}>Ingen anmodninger i denne kategori</div></Card>
+      )}
+
+      <div style={{display:"grid",gap:12}}>
+        {filtered.map((r,i)=>{
+          const person = users.find(u=>u.id===r.user_id);
+          const isOwn = r.user_id===user.id;
+          const canApprove = can(user,"approveRequests")&&r.status==="Afventer"&&!isOwn;
+          return(
+            <div key={r.id||i} style={{background:"#fff",border:`1.5px solid ${r.status==="Afventer"?"#fcd20940":r.status==="Godkendt"?"#2e9e5b30":"#dc262630"}`,borderRadius:12,padding:"16px 20px",display:"flex",gap:16,alignItems:"flex-start",flexWrap:"wrap"}}>
+              {can(user,"approveRequests")&&<Av src={person?.photo_url} initials={person?.avatar||"?"} size={42} bg={acc}/>}
+              <div style={{flex:1,minWidth:200}}>
+                {can(user,"approveRequests")&&<div style={{fontWeight:700,fontSize:14,marginBottom:2}}>{person?.name||"Ukendt"}<span style={{fontSize:11,color:"#aaa",fontWeight:400,marginLeft:8}}>{person?.dept||"—"}</span></div>}
+                <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:4}}>
+                  <span style={{fontWeight:700,fontSize:14}}>{r.type}</span>
+                  <Badge label={r.priority||"Normal"} color={priColor(r.priority)}/>
+                </div>
+                {(r.desc||r.description)&&<div style={{fontSize:13,color:"#555",lineHeight:1.5,background:"#f8f7f5",borderRadius:6,padding:"8px 12px",marginTop:4}}>{r.desc||r.description}</div>}
+                <div style={{fontSize:11,color:"#aaa",marginTop:6}}>📅 {fmt(r.date||r.created_at)}</div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:8,flexShrink:0}}>
+                <Badge label={r.status} color={r.status==="Godkendt"?"#2e9e5b":r.status==="Afvist"?"#dc2626":"#d97706"}/>
+                {canApprove&&(
+                  <div style={{display:"flex",gap:8,marginTop:4}}>
+                    <button onClick={()=>approveItem(r,"request")}
+                      style={{background:"#2e9e5b",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"'Urbanist',sans-serif"}}>
+                      ✓ Godkend
+                    </button>
+                    <button onClick={()=>rejectItem(r,"request")}
+                      style={{background:"#fff",color:"#dc2626",border:"1.5px solid #dc2626",borderRadius:8,padding:"8px 18px",fontWeight:600,fontSize:13,cursor:"pointer",fontFamily:"'Urbanist',sans-serif"}}>
+                      ✗ Afvis
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function PhoneEditor({user, setUser, setUsers, acc, showToast}) {
   const [editing, setEditing] = useState(false);
   const [phone, setPhone] = useState(user.phone||"");
@@ -1051,6 +1214,7 @@ export default function App() {
     supabase.from('audit_log').select('*').order('created_at',{ascending:false}).limit(50).then(({data})=>{ if(data) setAuditLog(data); });
     supabase.from('messages').select('*').or(`to_id.eq.${user.id},from_id.eq.${user.id}`).order('created_at',{ascending:false}).then(({data})=>{ if(data) setMessages(data.map(m=>({...m,fromId:m.from_id,toId:m.to_id,time:m.created_at}))); });
     supabase.from('notifications').select('*').eq('user_id',user.id).order('created_at',{ascending:false}).then(({data})=>{ if(data) setNotifs(data.map(n=>({...n,time:n.created_at}))); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[user?.id]);
 
   const acc = settings.accentColor;
@@ -1081,6 +1245,7 @@ export default function App() {
       .subscribe();
 
     return ()=>supabase.removeChannel(channel);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[user]);
   const pushNotif = async (user_id,text,type="info") => {
     await supabase.from('notifications').insert({user_id,text,type});
@@ -1093,8 +1258,10 @@ export default function App() {
   const myTeam    = user ? users.filter(u=>u.manager_id===user.id) : [];
   const milestones = user ? getMilestones(users) : [];
 
-  const visibleAbsence  = user ? (can(user,"approveAbsence") ? absence.filter(a=>myTeam.map(u=>u.id).includes(a.user_id)||a.user_id===user.id) : absence.filter(a=>a.user_id===user.id)) : [];
-  const visibleRequests = user ? (can(user,"approveRequests") ? requests.filter(r=>myTeam.map(u=>u.id).includes(r.user_id)||r.user_id===user.id) : requests.filter(r=>r.user_id===user.id)) : [];
+  // chef/direktør ser alle — leder ser kun sit direkte team
+  const canSeeAll = user && (user.role==="chef"||user.role==="direktør"||user.role==="it_admin");
+  const visibleAbsence  = user ? (can(user,"approveAbsence") ? (canSeeAll ? absence : absence.filter(a=>myTeam.map(u=>u.id).includes(a.user_id)||a.user_id===user.id)) : absence.filter(a=>a.user_id===user.id)) : [];
+  const visibleRequests = user ? (can(user,"approveRequests") ? (canSeeAll ? requests : requests.filter(r=>myTeam.map(u=>u.id).includes(r.user_id)||r.user_id===user.id)) : requests.filter(r=>r.user_id===user.id)) : [];
 
   const approveItem = async (item,type) => {
     if(type==="absence"){
@@ -1290,7 +1457,9 @@ export default function App() {
         </div>
       );
       case "pending_approvals": {
-        const pending=[...absence.filter(a=>myTeam.map(u=>u.id).includes(a.user_id)&&a.status==="Afventer").map(x=>({...x,_type:"absence"})),...requests.filter(r=>myTeam.map(u=>u.id).includes(r.user_id)&&r.status==="Afventer").map(x=>({...x,_type:"request"}))];
+        const pendingAbsence = canSeeAll ? absence.filter(a=>a.status==="Afventer"&&a.user_id!==user.id) : absence.filter(a=>myTeam.map(u=>u.id).includes(a.user_id)&&a.status==="Afventer");
+        const pendingRequests = canSeeAll ? requests.filter(r=>r.status==="Afventer"&&r.user_id!==user.id) : requests.filter(r=>myTeam.map(u=>u.id).includes(r.user_id)&&r.status==="Afventer");
+        const pending=[...pendingAbsence.map(x=>({...x,_type:"absence"})),...pendingRequests.map(x=>({...x,_type:"request"}))];
         return(<div>
           {pending.length===0&&<div style={{color:"#aaa",fontSize:13}}>Ingen afventende 🎉</div>}
           {pending.slice(0,5).map((item,i)=>{ const person=users.find(u=>u.id===item.user_id); return(
@@ -1436,65 +1605,21 @@ export default function App() {
       );
 
       case "absence": return(
-        <div style={{padding:24}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
-            <div style={{fontSize:13,color:"#888"}}>Anmodninger sendes til din leder og afdelingschef</div>
-            <Btn onClick={()=>setAbsenceModal(true)} accent={acc}>+ Ny anmodning</Btn>
-          </div>
-          <Card>
-            <STitle>{can(user,"approveAbsence")?"Alle anmodninger – dit hold":"Mine anmodninger"}</STitle>
-            {visibleAbsence.length===0&&<div style={{color:"#aaa",fontSize:13}}>Ingen anmodninger</div>}
-            {visibleAbsence.map((a,i)=>{ const person=users.find(u=>u.id===a.user_id); return(
-              <div key={a.id||i} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:"1px solid #f0ece5",flexWrap:"wrap"}}>
-                {can(user,"approveAbsence")&&<Av src={person?.photo_url} initials={person?.avatar||"?"} size={30} bg={acc}/>}
-                <div style={{flex:1}}>
-                  {can(user,"approveAbsence")&&<div style={{fontSize:11,color:"#aaa",marginBottom:2}}>{person?.name}</div>}
-                  <div style={{fontWeight:600,fontSize:14}}>{a.type}</div>
-                  <div style={{fontSize:12,color:"#888"}}>{fmt(a.from_date||a.from)} – {fmt(a.to_date||a.to)} · {a.days} dag{a.days!==1?"e":""}</div>
-                  {a.note&&<div style={{fontSize:12,color:"#aaa",marginTop:2}}>{a.note}</div>}
-                </div>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <Badge label={a.status} color={statColor(a.status)}/>
-                  {can(user,"approveAbsence")&&a.status==="Afventer"&&a.user_id!==user.id&&<>
-                    <Btn small accent="#2e9e5b" onClick={()=>approveItem(a,"absence")}>✓</Btn>
-                    <Btn small accent="#dc2626" variant="outline" onClick={()=>rejectItem(a,"absence")}>✗</Btn>
-                  </>}
-                </div>
-              </div>
-            );})}
-          </Card>
-        </div>
+        <AbsencePage
+          user={user} users={users} acc={acc}
+          visibleAbsence={visibleAbsence}
+          can={can} approveItem={approveItem} rejectItem={rejectItem}
+          setAbsenceModal={setAbsenceModal} fmt={fmt}
+        />
       );
 
       case "requests": return(
-        <div style={{padding:24}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:18,flexWrap:"wrap",gap:10}}>
-            <div style={{fontSize:13,color:"#888"}}>Anmodninger sendes til din leder</div>
-            <Btn onClick={()=>setRequestModal(true)} accent={acc}>+ Ny anmodning</Btn>
-          </div>
-          <Card>
-            <STitle>{can(user,"approveRequests")?"Alle anmodninger – dit hold":"Mine anmodninger"}</STitle>
-            {visibleRequests.length===0&&<div style={{color:"#aaa",fontSize:13}}>Ingen anmodninger</div>}
-            {visibleRequests.map((r,i)=>{ const person=users.find(u=>u.id===r.user_id); return(
-              <div key={r.id||i} style={{display:"flex",alignItems:"center",gap:12,padding:"12px 0",borderBottom:"1px solid #f0ece5",flexWrap:"wrap"}}>
-                {can(user,"approveRequests")&&<Av src={person?.photo_url} initials={person?.avatar||"?"} size={30} bg={acc}/>}
-                <div style={{flex:1}}>
-                  {can(user,"approveRequests")&&<div style={{fontSize:11,color:"#aaa",marginBottom:2}}>{person?.name}</div>}
-                  <div style={{fontWeight:600,fontSize:14}}>{r.type}</div>
-                  <div style={{fontSize:12,color:"#888",marginTop:2}}>{r.desc||r.description}</div>
-                  <div style={{display:"flex",gap:6,marginTop:4}}><Badge label={r.priority} color={priColor(r.priority)}/><span style={{fontSize:11,color:"#aaa"}}>{fmt(r.date||r.created_at)}</span></div>
-                </div>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <Badge label={r.status} color={statColor(r.status)}/>
-                  {can(user,"approveRequests")&&r.status==="Afventer"&&r.user_id!==user.id&&<>
-                    <Btn small accent="#2e9e5b" onClick={()=>approveItem(r,"request")}>✓</Btn>
-                    <Btn small accent="#dc2626" variant="outline" onClick={()=>rejectItem(r,"request")}>✗</Btn>
-                  </>}
-                </div>
-              </div>
-            );})}
-          </Card>
-        </div>
+        <RequestsPage
+          user={user} users={users} acc={acc}
+          visibleRequests={visibleRequests}
+          can={can} approveItem={approveItem} rejectItem={rejectItem}
+          setRequestModal={setRequestModal} fmt={fmt}
+        />
       );
 
       case "followup": return <FollowupPage users={users} absence={absence} user={user} acc={acc}/>;
