@@ -1206,7 +1206,7 @@ export default function App() {
     supabase.from('settings').select('*').single().then(({data})=>{ if(data) setSettings({companyName:data.company_name,accentColor:data.accent_color,logo:data.logo_url}); });
     supabase.from('users').select('*').then(({data})=>{ if(data) setUsers(data); });
     supabase.from('news').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setNews(data.map(n=>({...n,date:n.created_at?.slice(0,10),pinned:n.pinned||false}))); });
-    supabase.from('events').select('*, event_attendees(user_id)').order('event_date',{ascending:true}).then(({data})=>{ if(data) setEvents(data.map(e=>({...e,date:e.event_date,time:e.event_time,desc:e.description,type:e.type||'Andet',attendees:(e.event_attendees||[]).map(a=>a.user_id)}))); });
+    supabase.from('events').select('*, event_attendees(user_id)').order('date',{ascending:true}).then(({data})=>{ if(data) setEvents(data.map(e=>({...e,desc:e.description,type:e.type||'Andet',attendees:(e.event_attendees||[]).map(a=>a.user_id)}))); });
     supabase.from('absence').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setAbsence(data.map(a=>({...a,from:a.from_date,to:a.to_date}))); });
     supabase.from('requests').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setRequests(data.map(r=>({...r,desc:r.description,date:r.created_at?.slice(0,10)}))); });
     supabase.from('audit_log').select('*').order('created_at',{ascending:false}).limit(50).then(({data})=>{ if(data) setAuditLog(data); });
@@ -1223,7 +1223,7 @@ export default function App() {
     if(!user) return;
 
     const loadNews     = () => supabase.from('news').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setNews(data.map(n=>({...n,date:n.created_at?.slice(0,10),pinned:n.pinned||false}))); });
-    const loadEvents   = () => supabase.from('events').select('*, event_attendees(user_id)').order('event_date',{ascending:true}).then(({data})=>{ if(data) setEvents(data.map(e=>({...e,date:e.event_date,time:e.event_time,desc:e.description,type:e.type||'Andet',attendees:(e.event_attendees||[]).map(a=>a.user_id)}))); });
+    const loadEvents   = () => supabase.from('events').select('*, event_attendees(user_id)').order('date',{ascending:true}).then(({data})=>{ if(data) setEvents(data.map(e=>({...e,desc:e.description,type:e.type||'Andet',attendees:(e.event_attendees||[]).map(a=>a.user_id)}))); });
     const loadMessages = () => supabase.from('messages').select('*').or(`to_id.eq.${user.id},from_id.eq.${user.id}`).order('created_at',{ascending:false}).then(({data})=>{ if(data) setMessages(data.map(m=>({...m,fromId:m.from_id,toId:m.to_id,time:m.created_at}))); });
     const loadAbsence  = () => supabase.from('absence').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setAbsence(data.map(a=>({...a,from:a.from_date,to:a.to_date}))); });
     const loadRequests = () => supabase.from('requests').select('*').order('created_at',{ascending:false}).then(({data})=>{ if(data) setRequests(data.map(r=>({...r,desc:r.description,date:r.created_at?.slice(0,10)}))); });
@@ -1816,11 +1816,12 @@ export default function App() {
           <Btn variant="outline" accent="#999" onClick={()=>setEventModal(false)} style={{flex:1}}>Annuller</Btn>
           <Btn accent={acc} style={{flex:2}} onClick={async()=>{
             if(!f.title||!f.date) return;
-            const {data}=await supabase.from('events').insert({
-              title:f.title, event_date:f.date, event_time:f.time,
+            const {data,error}=await supabase.from('events').insert({
+              title:f.title, date:f.date, time:f.time,
               location:f.location, description:f.desc, created_by:user.id, type:f.type
             }).select().single();
-            if(data) setEvents(e=>[{...data,date:data.event_date,time:data.event_time,desc:data.description,type:data.type,attendees:[]},...e]);
+            if(error){ console.error("Event insert fejl:",error); showToast("Fejl: "+error.message,"warning"); return; }
+            if(data) setEvents(e=>[{...data,date:data.date,time:data.time,desc:data.description,type:data.type||'Andet',attendees:[]},...e]);
             const recipients = getRecipients();
             for(const u of recipients){ await pushNotif(u.id,"Nyt event: "+f.title,"info"); }
             setEventModal(false);
